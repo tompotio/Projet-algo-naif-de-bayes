@@ -4,6 +4,18 @@ import math
 import re
 import pickle
 
+# ======================================================================================
+# 								ALGORITHME NAIF DE BAYES
+# ======================================================================================
+
+'''
+	@brief	Fonction qui charge un dictionnaire dans un tableau (liste python) de
+	mots à partir d'un fichier texte donné en paramètre. Un 
+
+	@param fichier : Fichier texte.
+
+	@return Dictionnaire chargé.
+'''
 def lireMail(fichier, dictionnaire : list):
 	try:
 		with open(fichier, "r", encoding="utf-8", errors="ignore") as file:
@@ -25,10 +37,18 @@ def lireMail(fichier, dictionnaire : list):
 			i = dictionnaire.index(mot)
 			x[i] = True
 		except:
-			continue            
+			continue       
 
 	return x
 
+'''
+	@brief	Fonction qui charge un dictionnaire dans un tableau (liste python) de
+	mots à partir d'un fichier texte donné en paramètre. Un 
+
+	@param fichier : Fichier texte.
+
+	@return Dictionnaire chargé.
+'''
 def charge_dico(fichier):
 	f = open(fichier, "r")
 	mots = f.read().split("\n")
@@ -36,12 +56,16 @@ def charge_dico(fichier):
 
 	return [str.lower(mot) for mot in mots  if len(mot) > 2] # Retire les mots avec moins de 3 lettres
 
-def apprendBinomial(dossier, fichiers, dictionnaire):
-	"""
-	Fonction d'apprentissage d'une loi binomiale a partir des fichiers d'un dossier
-	Retourne un vecteur b de paramètres 
-	"""
+'''
+	@brief	Fonction d'apprentissage d'une loi binomiale a partir des fichiers d'un dossier
 
+	@param dossier : Chemin du dossier contenant les données à apprendre.
+	@param fichiers : Noms des fichiers des données à apprendre.
+	@param dictionnaire : Mots connus sur lesquels apprendre.
+			
+	@return Un vecteur b de paramètres 
+'''
+def apprendBinomial(dossier, fichiers, dictionnaire):
 	m = len(dictionnaire)
 	N = len(fichiers)
 
@@ -61,67 +85,141 @@ def apprendBinomial(dossier, fichiers, dictionnaire):
 	
 	return b
 
+'''
+	@brief	Prédit si un mail représenté par un vecteur booléen x est un spam
+	à partir du modèle de paramètres Pspam, Pham, bspam, bham.
 
+	@param x : Vecteur booléens des mots apparaissant dans le mail.
+	@param Pspam : Probabilité que le mail soit un SPAM.
+	@param Pham : Probabilité que le mail soit un HAM.
+	@param bspam : Vecteur des probabilités des mots appris étant susceptibles d'être dans un SPAM.
+	@param bham : Vecteur des probabilités des mots appris étant susceptibles d'être dans un HAM.
+			
+	@return Le taux d'erreur 
+'''
 def prediction(x, Pspam, Pham, bspam, bham):
 	"""
-		Prédit si un mail représenté par un vecteur booléen x est un spam
-		à partir du modèle de paramètres Pspam, Pham, bspam, bham.
 		Retourne True ou False.
 	"""
 
+	# Calcul des probabilités à l'aide du log
+	logPspam = np.sum(
+		x * np.log(bspam) + (1-x) * np.log( 1 - bspam)
+	)
+
+	logPham = np.sum(
+		x * np.log(bham) + (1-x) * np.log( 1 - bham)
+	)
+
+	'''
 	logPspam = np.sum(
 		np.log(
-			(bspam ** x) * ((1 - bspam) ** (1 - x))
+			(bspam**x)*((1-bspam)**(1-x))
 		)
 	)
 
 	logPham = np.sum(
 		np.log(
-			(bham ** x) * ((1 - bham) ** (1 - x))
+			(bham**x)*((1-bham)**(1-x))
 		)
 	)
+	'''
+
+	if np.isnan(logPham) or np.isnan(logPspam): 
+		print("NaN")
 
 	logPspam += np.log(Pspam)
 	logPham += np.log(Pham)
+
+	# Interprétation des sommes de log en probabilités entre ]0;1[ à l'aide de la fonction sigmoïde
+	Pspam_x = 1 / (1 + np.exp(logPham - logPspam))
+	Pham_x = 1 - Pspam_x
 	
-	return (logPspam > logPham)
-	
-def test(dossier, isSpam, Pspam, Pham, bspam, bham):
-	"""
-		Test le classifieur de paramètres Pspam, Pham, bspam, bham 
-		sur tous les fichiers d'un dossier étiquetés 
-		comme SPAM si isSpam et HAM sinon
+	# Checking SPAM ou HAM
+	isSpam = (logPspam > logPham)
+
+	return isSpam, Pspam_x, Pham_x
+
+'''
+	@brief	Teste le classifieur de paramètres Pspam, Pham, bspam, bhamsur 
+	sur tous les fichiers d'un dossier étiquetés comme SPAM si isSpam et HAM sinon
 		
-		Retourne le taux d'erreur 
-	"""
+	@return Le taux d'erreur 
+'''
+def test(dossier, isSpam, Pspam, Pham, bspam, bham):
 
 	fichiers = os.listdir(dossier)
 	nb_erreurs = 0
 	total_mails = len(fichiers)
 	
-	for fichier in fichiers:
+	for i in range(total_mails):
+		fichier = fichiers[i]
+
 		chemin_fichier = dossier + "/" + fichier		
 		x = lireMail(chemin_fichier, dictionnaire)
-		isSpam_prediction = prediction(x, Pspam, Pham, bspam, bham)
+		isSpam_pred, Pspam_x, Pham_x = prediction(x, Pspam, Pham, bspam, bham)
 
-		if isSpam_prediction != isSpam:
+		if isSpam_pred != isSpam:
 			nb_erreurs += 1
-		
-		'''
-		if isSpam_prediction and isSpam: 
-			print("SPAM ", chemin_fichier, " identifié comme un SPAM" )
-		elif isSpam_prediction and not isSpam:
-			print("HAM ", chemin_fichier, " identifié comme un SPAM *** erreur ***" )
-		elif not isSpam_prediction and isSpam:
-			print("SPAM ", chemin_fichier, " identifié comme un HAM *** erreur ***" )
+
+		output = f"SPAM numéro {i} :" if isSpam else f"HAM numéro {i} :"
+		output += f" P(Y=SPAM | X=x) = {Pspam_x} P(Y=HAM | X=x) = {Pham_x}"
+
+		if isSpam_pred and isSpam: 
+			output += " => identifié comme un SPAM*" 
+		elif isSpam_pred and not isSpam:
+			output += " => identifié comme un SPAM *** erreur ***" 
+		elif not isSpam_pred and isSpam:
+			output += " => identifié comme un HAM *** erreur ***"
 		else:
-			print("HAM ", chemin_fichier, " identifié comme un HAM")
-		'''
+			output += " => identifié comme un HAM"
 
-	return (nb_erreurs / total_mails)
+		print(output)
 
-############ programme principal ############
+	return (nb_erreurs / total_mails)	
 
+# ======================================================================================
+# 									CLASSIFIEUR
+# ======================================================================================
+
+def testClassifieur(dossier, isSpam, classifieur):
+	pass
+
+'''
+	@brief Sauvegarde un classifieur.
+
+	@param dossier : Chemin du dossier dans lequel enregistrer le classifieur.
+	@param nom : Nom du fichier à enregistrer.
+'''
+def sauvegarderClassifieur(classifieur, dossier = "saves", nom = "classifieur.pkl"):
+	try:
+		with open(nom,"wb") as f:
+			pickle.dump(classifieur,f)
+	except:
+		print("Une erreur est suvrenue\nLe classifieur n'a pas pu être sauvegardé correctement.\n")
+
+'''
+	@brief Charge un classifieur et renvoie un objet classifieur, qui peut être ensuite utilisé.
+
+	@dossier : Checmin du dossier dans lequel a été enregistré le classifieur.i
+
+	@return Un classifieur.
+'''
+
+'''
+def chargerClassifieur(dossier = "saves", nom = "classifieur.pkl"):
+	if not os.path.exists(nom):
+		print(f"Erreur -> Aucun fichier de ce type : {nom}")
+		return None
+	else: open(nom,"rb") as f:
+
+nomdosreturn pickle.load(f)er_spams =f 
+'''
+
+# ======================================================================================
+# 										PROGRAMME
+# ======================================================================================
+			
 dossier_spams = "baseapp/spam"
 dossier_hams = "baseapp/ham"
 
@@ -168,3 +266,13 @@ total_err_rate = (((spam_err_rate * mSpam) + (ham_err_rate * mHam)) / total_test
 print("Erreur de test sur ", mSpam_test, " SPAM : ", spam_err_rate, " %")
 print("Erreur de test sur ", mHam_test, " HAM : ", ham_err_rate, " %")
 print("Erreur de test globale sur ", total_test, " mails : ", total_err_rate, " %")
+
+classifieur = {
+    "Pspam": Pspam,
+    "Pham": Pham,
+    "bspam": bspam,
+    "bham": bham,
+    "dictionnaire": dictionnaire,
+    "mSpam": mSpam,
+    "mHam": mHam
+}
