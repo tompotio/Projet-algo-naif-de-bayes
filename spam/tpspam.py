@@ -182,8 +182,10 @@ def test(dossier, isSpam, Pspam, Pham, bspam, bham):
 # 									CLASSIFIEUR
 # ======================================================================================
 
-def testClassifieur(dossier, isSpam, classifieur):
-	pass
+def testClassifieur(epsilon,dossier, isSpam, classifieur):
+	print("\n<"+"="*30+"TEST_CLASSIFIEUR"+"="*30+">\n")
+	sauvegarderClassifieur(classifieur,dossier,"classifieur.pkl")
+	mis_a_jour_Classifieur(epsilon,fichiersspams_test,isSpam)
 
 '''
 	@brief Sauvegarde un classifieur.
@@ -192,11 +194,16 @@ def testClassifieur(dossier, isSpam, classifieur):
 	@param nom : Nom du fichier à enregistrer.
 '''
 def sauvegarderClassifieur(classifieur, dossier = "saves", nom = "classifieur.pkl"):
+	if not os.path.exists(dossier):
+		os.makedirs(dossier)
+	chemin_fichier = os.path.join(dossier,nom)
 	try:
-		with open(nom,"wb") as f:
+		with open(chemin_fichier,"wb") as f:
 			pickle.dump(classifieur,f)
+			return 1
 	except:
 		print("Une erreur est suvrenue\nLe classifieur n'a pas pu être sauvegardé correctement.\n")
+		return None
 
 '''
 	@brief Charge un classifieur et renvoie un objet classifieur, qui peut être ensuite utilisé.
@@ -206,15 +213,42 @@ def sauvegarderClassifieur(classifieur, dossier = "saves", nom = "classifieur.pk
 	@return Un classifieur.
 '''
 
-'''
 def chargerClassifieur(dossier = "saves", nom = "classifieur.pkl"):
-	if not os.path.exists(nom):
+	chemin_fichier = os.path.join(dossier,nom)
+	if not os.path.exists(chemin_fichier):
 		print(f"Erreur -> Aucun fichier de ce type : {nom}")
 		return None
-	else: open(nom,"rb") as f:
+	else: 
+		with open(chemin_fichier,"rb") as f:
+			return pickle.load(f)
 
-nomdosreturn pickle.load(f)er_spams =f 
-'''
+def mis_a_jour_Classifieur(epsilon, mail, isSpam, dossiers = "baseapp/spam",dossier = "saves",classifieur = "classifieur.pkl"):
+	classifieur = chargerClassifieur()
+	if classifieur == None:
+		print("Erreur lors de la récupération du classifieur")
+		return
+	else:
+		dictionnaire = classifieur["dictionnaire"]
+		for Mail in mail : 
+			chemin_mail = dossiers + "/" + Mail
+			lecture_mail = lireMail(chemin_mail,dictionnaire)
+			if isSpam:
+				classifieur["mSpam"]+=1
+				mSpam = classifieur["mSpam"]
+				classifieur["bspam"] = (classifieur["bspam"]*(mSpam-1)+lecture_mail+epsilon) / (mSpam + 2 * epsilon)
+			else:
+				classifieur["mHam"]+=1
+				mSpam = classifieur["mHam"]
+				classifieur["bham"] = (classifieur["bham"]*(mHam-1)+lecture_mail+epsilon) / (mHam + 2 * epsilon)
+		total = classifieur["mSpam"] + classifieur["mHam"]
+		classifieur["Pspam"] = classifieur["mSpam"] / total
+		classifieur["Pham"] = classifieur["mHam"] / total
+		sauvegarde_classifieur = sauvegarderClassifieur(classifieur,"saves","classifieur.pkl")
+		if sauvegarde_classifieur is not None:
+			print("Sauvegarde Classifieur : Réussi")
+			print("Le classifieur a bien été mis à jour !\n")
+		else:
+			print("Erreur lors de la sauvegarde du classifieur\n")
 
 # ======================================================================================
 # 										PROGRAMME
@@ -276,3 +310,4 @@ classifieur = {
     "mSpam": mSpam,
     "mHam": mHam
 }
+testClassifieur(0.1,"saves",True,classifieur)
