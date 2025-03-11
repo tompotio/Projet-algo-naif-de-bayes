@@ -4,6 +4,8 @@ import math
 import re
 import pickle
 
+epsilon = .1
+
 # ======================================================================================
 # 								ALGORITHME NAIF DE BAYES
 # ======================================================================================
@@ -41,6 +43,7 @@ def lireMail(fichier, dictionnaire : list):
 
 	return x
 
+
 '''
 	@brief	Fonction qui charge un dictionnaire dans un tableau (liste python) de
 	mots à partir d'un fichier texte donné en paramètre. Un 
@@ -55,6 +58,7 @@ def charge_dico(fichier):
 	f.close()
 
 	return [str.lower(mot) for mot in mots  if len(mot) > 2] # Retire les mots avec moins de 3 lettres
+
 
 '''
 	@brief	Fonction d'apprentissage d'une loi binomiale a partir des fichiers d'un dossier
@@ -76,7 +80,7 @@ def apprendBinomial(dossier, fichiers, dictionnaire):
 		x = lireMail(chemin_fichier, dictionnaire)  # vecteur binaire du mail
 		b += x 
 
-	epsilon = .1
+	global epsilon
 
 	# Application du lissage de Laplace (epsilon = 1)
 	b = (b + epsilon) / (N + 2 * epsilon)  # Lissage : +1 au numérateur, +2 au dénominateur
@@ -84,6 +88,7 @@ def apprendBinomial(dossier, fichiers, dictionnaire):
 	# b = b / N
 	
 	return b
+
 
 '''
 	@brief	Prédit si un mail représenté par un vecteur booléen x est un spam
@@ -140,6 +145,7 @@ def prediction(x, Pspam, Pham, bspam, bham):
 
 	return isSpam, Pspam_x, Pham_x
 
+
 '''
 	@brief	Teste le classifieur de paramètres Pspam, Pham, bspam, bhamsur 
 	sur tous les fichiers d'un dossier étiquetés comme SPAM si isSpam et HAM sinon
@@ -147,7 +153,6 @@ def prediction(x, Pspam, Pham, bspam, bham):
 	@return Le taux d'erreur 
 '''
 def test(dossier, isSpam, Pspam, Pham, bspam, bham):
-
 	fichiers = os.listdir(dossier)
 	nb_erreurs = 0
 	total_mails = len(fichiers)
@@ -178,14 +183,29 @@ def test(dossier, isSpam, Pspam, Pham, bspam, bham):
 
 	return (nb_erreurs / total_mails)	
 
+
 # ======================================================================================
 # 									CLASSIFIEUR
 # ======================================================================================
 
-def testClassifieur(epsilon,dossier, isSpam, classifieur):
-	print("\n<"+"="*30+"TEST_CLASSIFIEUR"+"="*30+">\n")
-	sauvegarderClassifieur(classifieur,dossier,"classifieur.pkl")
-	mis_a_jour_Classifieur(epsilon,fichiersspams_test,isSpam)
+'''
+	@brief Fonctionne exactement comme test mais à partir d'un classifieur 
+	sous forme de structure plutôt que de toute la liste des paramètres.
+
+	@param dossier : Dossier des mails à tester. 
+	@param classifier :
+
+	@return Le taux d'erreur.
+'''
+def testClassifieur(dossier, isSpam, classifieur):
+	fichiers = os.listdir(dossier)
+	nb_erreurs = 0
+	total_mails = len(fichiers)
+
+	Pspam, Pham, bspam, bham = (classifieur[k] for k in ["Pspam", "Pham", "bspam", "bham"])
+
+	return test(dossier, Pham, bspam, bham)
+
 
 '''
 	@brief Sauvegarde un classifieur.
@@ -205,6 +225,7 @@ def sauvegarderClassifieur(classifieur, dossier = "saves", nom = "classifieur.pk
 		print("Une erreur est suvrenue\nLe classifieur n'a pas pu être sauvegardé correctement.\n")
 		return None
 
+
 '''
 	@brief Charge un classifieur et renvoie un objet classifieur, qui peut être ensuite utilisé.
 
@@ -212,7 +233,6 @@ def sauvegarderClassifieur(classifieur, dossier = "saves", nom = "classifieur.pk
 
 	@return Un classifieur.
 '''
-
 def chargerClassifieur(dossier = "saves", nom = "classifieur.pkl"):
 	chemin_fichier = os.path.join(dossier,nom)
 	if not os.path.exists(chemin_fichier):
@@ -222,13 +242,16 @@ def chargerClassifieur(dossier = "saves", nom = "classifieur.pkl"):
 		with open(chemin_fichier,"rb") as f:
 			return pickle.load(f)
 
-def mis_a_jour_Classifieur(epsilon, mail, isSpam, dossiers = "baseapp/spam",dossier = "saves",classifieur = "classifieur.pkl"):
-	classifieur = chargerClassifieur()
+
+def updateClassifieur(isSpam, classifieur, dossiers = "baseapp/spam", dossier = "saves"):
+	global epsilon 
+
 	if classifieur == None:
 		print("Erreur lors de la récupération du classifieur")
 		return
 	else:
 		dictionnaire = classifieur["dictionnaire"]
+		
 		for Mail in mail : 
 			chemin_mail = dossiers + "/" + Mail
 			lecture_mail = lireMail(chemin_mail,dictionnaire)
@@ -240,15 +263,18 @@ def mis_a_jour_Classifieur(epsilon, mail, isSpam, dossiers = "baseapp/spam",doss
 				classifieur["mHam"]+=1
 				mSpam = classifieur["mHam"]
 				classifieur["bham"] = (classifieur["bham"]*(mHam-1)+lecture_mail+epsilon) / (mHam + 2 * epsilon)
+				
 		total = classifieur["mSpam"] + classifieur["mHam"]
 		classifieur["Pspam"] = classifieur["mSpam"] / total
 		classifieur["Pham"] = classifieur["mHam"] / total
 		sauvegarde_classifieur = sauvegarderClassifieur(classifieur,"saves","classifieur.pkl")
+
 		if sauvegarde_classifieur is not None:
 			print("Sauvegarde Classifieur : Réussi")
 			print("Le classifieur a bien été mis à jour !\n")
 		else:
 			print("Erreur lors de la sauvegarde du classifieur\n")
+
 
 # ======================================================================================
 # 										PROGRAMME
@@ -310,4 +336,11 @@ classifieur = {
     "mSpam": mSpam,
     "mHam": mHam
 }
+
 testClassifieur(0.1,"saves",True,classifieur)
+
+'''
+print("\n<"+"="*30+"TEST_CLASSIFIEUR"+"="*30+">\n")
+sauvegarderClassifieur(classifieur,dossier,"classifieur.pkl")
+mis_a_jour_Classifieur(epsilon,fichiersspams_test,isSpam)
+'''
