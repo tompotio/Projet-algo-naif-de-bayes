@@ -167,7 +167,7 @@ def test(dossier, dictionnaire, isSpam, Pspam, Pham, bspam, bham):
 
 		print(output)
 
-	return (nb_erreurs / total_mails)	
+	return (nb_erreurs / total_mails)
 
 
 # ======================================================================================
@@ -184,13 +184,8 @@ def test(dossier, dictionnaire, isSpam, Pspam, Pham, bspam, bham):
 	@return Le taux d'erreur.
 '''
 def testClassifieur(dossier, isSpam, classifieur):
-	fichiers = os.listdir(dossier)
-	nb_erreurs = 0
-	total_mails = len(fichiers)
-
-	Pspam, Pham, bspam, bham = (classifieur[k] for k in ["Pspam", "Pham", "bspam", "bham"])
-
-	return test(dossier, Pham, bspam, bham)
+	Pspam, Pham, bspam, bham, dictionnaire = (classifieur[k] for k in ["Pspam", "Pham", "bspam", "bham", "dictionnaire"])
+	return test(dossier, dictionnaire, isSpam, Pspam, Pham, bspam, bham)
 
 
 '''
@@ -229,38 +224,36 @@ def chargerClassifieur(dossier = "saves", nom = "classifieur.pkl"):
 			return pickle.load(f)
 
 
-def updateClassifieur(isSpam, classifieur, dossiers = "baseapp/spam", dossier = "saves"):
+def updateClassifieur(chemin_mail, isSpam, classifieur):
 	global epsilon 
 
 	if classifieur == None:
 		print("Erreur lors de la récupération du classifieur")
 		return
-	else:
-		dictionnaire = classifieur["dictionnaire"]
-		
-		for Mail in mail : 
-			chemin_mail = dossiers + "/" + Mail
-			lecture_mail = lireMail(chemin_mail,dictionnaire)
-			if isSpam:
-				classifieur["mSpam"]+=1
-				mSpam = classifieur["mSpam"]
-				classifieur["bspam"] = (classifieur["bspam"]*(mSpam-1)+lecture_mail+epsilon) / (mSpam + 2 * epsilon)
-			else:
-				classifieur["mHam"]+=1
-				mSpam = classifieur["mHam"]
-				classifieur["bham"] = (classifieur["bham"]*(mHam-1)+lecture_mail+epsilon) / (mHam + 2 * epsilon)
-				
-		total = classifieur["mSpam"] + classifieur["mHam"]
-		classifieur["Pspam"] = classifieur["mSpam"] / total
-		classifieur["Pham"] = classifieur["mHam"] / total
-		sauvegarde_classifieur = sauvegarderClassifieur(classifieur,"saves","classifieur.pkl")
+	
+	dictionnaire = classifieur["dictionnaire"]
+	x = lireMail(chemin_mail, dictionnaire).astype(float)
+	
+	if isSpam:
+		old_m = classifieur["mSpam"]
+		old_nj = classifieur["bspam"] * (old_m + 2 * epsilon) - epsilon
+		new_nj = old_nj + x
+		new_m = old_m + 1
+		classifieur["bspam"] = (new_nj + epsilon) / (new_m + 2 * epsilon)
+		classifieur["mSpam"] = new_m
+	else: 
+		old_m = classifieur["mHam"]
+		old_nj = classifieur["bham"] * (old_m + 2 * epsilon) - epsilon
+		new_nj = old_nj + x
+		new_m = old_m + 1
+		classifieur["bham"] = (new_nj + epsilon) / (new_m + 2 * epsilon)
+		classifieur["mHam"] = new_m	
 
-		if sauvegarde_classifieur is not None:
-			print("Sauvegarde Classifieur : Réussi")
-			print("Le classifieur a bien été mis à jour !\n")
-		else:
-			print("Erreur lors de la sauvegarde du classifieur\n")
+	total = classifieur["mHam"] + classifieur["mSpam"]
+	classifieur["PSpam"] = classifieur["mSpam"] / total
+	classifieur["Pham"] = classifieur["mHam"] / total
 
+	print("Le classifieur a été mis à jour avec le nouveau mail : ", chemin_mail)
 
 # ======================================================================================
 # 										PROGRAMME
@@ -268,14 +261,15 @@ def updateClassifieur(isSpam, classifieur, dossiers = "baseapp/spam", dossier = 
 
 
 def menu():
-    print("\n===== FILTRE ANTI-SPAM : MENU PRINCIPAL =====")
-    print("1. Sélectionner un classifieur existant")
-    print("2. Créer un nouveau classifieur")
-    print("3. Sauvegarder le classifieur courant")
-    print("4. Lancer le test du classifieur")
-    print("5. Supprimer un classifieur")
-    print("6. Quitter")
-    return input("Votre choix : ")
+	print("\n===== FILTRE ANTI-SPAM : MENU PRINCIPAL =====")
+	print("1. Sélectionner un classifieur existant")
+	print("2. Créer un nouveau classifieur")
+	print("3. Sauvegarder le classifieur courant")
+	print("4. Lancer le test du classifieur")
+	print("5. Supprimer un classifieur")
+	print("6. Mettre à jour le classifieur")
+	print("7. Quitter")
+	return input("Votre choix : ")
 
 
 def lister_classifieurs(dossier="saves"):
@@ -357,51 +351,52 @@ def creer_classifieur():
 
 
 def sauvegarder_classifieur_interface(classifieur):
-    if classifieur is None:
-        print("Aucun classifieur n'est chargé pour sauvegarde.")
-        return
-    nom = input("Entrez le nom sous lequel sauvegarder le classifieur (exemple: monClassifieur.pkl) : ")
-    if sauvegarderClassifieur(classifieur, dossier="saves", nom=nom):
-        print(f"Classifieur sauvegardé sous {nom}.")
-    else:
-        print("Échec de la sauvegarde.")
+	if classifieur is None:
+		print("Aucun classifieur n'est chargé pour sauvegarde.")
+		return
+	nom = input("Entrez le nom sous lequel sauvegarder le classifieur (exemple: monClassifieur) : ")
+	nom = nom + ".pkl"
+	if sauvegarderClassifieur(classifieur, dossier="saves", nom=nom):
+		print(f"Classifieur sauvegardé sous {nom}.")
+	else:
+		print("Échec de la sauvegarde.")
 
 
 def lancer_test(classifieur):
-    if classifieur is None:
-        print("Aucun classifieur n'est chargé pour effectuer un test.")
-        return
+	if classifieur is None:
+		print("Aucun classifieur n'est chargé pour effectuer un test.")
+		return
 		
-    # Choix de la base de test
-    choix_test = input("Utiliser la base de test par défaut (tapez 'd') ou une base personnalisée (tapez 'p') ? ")
-    if choix_test.lower() == 'd':
-        dossier_spams_test = "basetest/spam"
-        dossier_hams_test = "basetest/ham"
-    elif choix_test.lower() == 'p':
-        dossier_spams_test = input("Entrez le chemin vers le dossier de test des SPAM : ")
-        dossier_hams_test = input("Entrez le chemin vers le dossier de test des HAM : ")
-    else:
-        print("Choix non reconnu. Utilisation de la base de test par défaut.")
-        dossier_spams_test = "basetest/spam"
-        dossier_hams_test = "basetest/ham"
+	# Choix de la base de test
+	choix_test = input("Utiliser la base de test par défaut (tapez 'd') ou une base personnalisée (tapez 'p') ? ")
+	if choix_test.lower() == 'd':
+		dossier_spams_test = "basetest/spam"
+		dossier_hams_test = "basetest/ham"
+	elif choix_test.lower() == 'p':
+		dossier_spams_test = input("Entrez le chemin vers le dossier de test des SPAM : ")
+		dossier_hams_test = input("Entrez le chemin vers le dossier de test des HAM : ")
+	else:
+		print("Choix non reconnu. Utilisation de la base de test par défaut.")
+		dossier_spams_test = "basetest/spam"
+		dossier_hams_test = "basetest/ham"
 
-    fichiers_spams_test = os.listdir(dossier_spams_test)
-    fichiers_hams_test = os.listdir(dossier_hams_test)
-    mSpam_test = len(fichiers_spams_test)
-    mHam_test = len(fichiers_hams_test)
-    total_test = mSpam_test + mHam_test
+	fichiers_spams_test = os.listdir(dossier_spams_test)
+	fichiers_hams_test = os.listdir(dossier_hams_test)
+	mSpam_test = len(fichiers_spams_test)
+	mHam_test = len(fichiers_hams_test)
+	total_test = mSpam_test + mHam_test
 
-    # Test sur spam et ham
-    print("\nTest sur les SPAM:")
-    spam_err_rate = test(dossier_spams_test, True, classifieur["Pspam"], classifieur["Pham"], classifieur["bspam"], classifieur["bham"]) * 100
-    print("\nTest sur les HAM:")
-    ham_err_rate = test(dossier_hams_test, False, classifieur["Pspam"], classifieur["Pham"], classifieur["bspam"], classifieur["bham"]) * 100
+	# Test sur spam et ham
+	print("\nTest sur les SPAM:")
+	spam_err_rate = testClassifieur(dossier_spams_test, True, classifieur) * 100
+	print("\nTest sur les HAM:")
+	ham_err_rate = testClassifieur(dossier_hams_test, False, classifieur) * 100
 
-    total_err_rate = (((spam_err_rate * mSpam_test) + (ham_err_rate * mHam_test)) / total_test)
-    print("\n===== RÉSULTATS DU TEST =====")
-    print(f"Erreur de test sur {mSpam_test} SPAM : {spam_err_rate:.2f} %")
-    print(f"Erreur de test sur {mHam_test} HAM : {ham_err_rate:.2f} %")
-    print(f"Erreur de test globale sur {total_test} mails : {total_err_rate:.2f} %")
+	total_err_rate = (((spam_err_rate * mSpam_test) + (ham_err_rate * mHam_test)) / total_test)
+	print("\n===== RÉSULTATS DU TEST =====")
+	print("Erreur de test sur ", mSpam_test, " SPAM : ", spam_err_rate, " %")
+	print("Erreur de test sur ", mHam_test, " HAM : ", ham_err_rate, " %")
+	print("Erreur de test globale sur ", total_test, " mails : ", total_err_rate, " %")
 
 
 def supprimer_classifieur():
@@ -417,6 +412,16 @@ def supprimer_classifieur():
         print(f"Classifieur {nom} supprimé.")
     except Exception as e:
         print("Erreur lors de la suppression :", e)
+
+
+def maj_classifieur(classifieur):
+	chemin = input("Veuillez renseigner le chemin absolue vers le fichier mail : ")
+	isSpam = input("Votre mail est-il un spam ? (tapez 'y' ou 'n')")
+
+	if isSpam.lower() == 'y':
+		return updateClassifieur(chemin, True, classifieur)
+	else:
+		return updateClassifieur(chemin, False, classifieur)
 
 
 if __name__ == '__main__':
@@ -444,7 +449,18 @@ if __name__ == '__main__':
 			# Supprime un classifieur.
 			supprimer_classifieur()
 		elif choix == "6":
+			maj_classifieur(classifieur_courant)
+		elif choix == "7":
 			print("Au revoir !")
 			break
 		else:
 			print("Option non reconnue. Veuillez réessayer.")
+
+'''
+
+===== RÉSULTATS DU TEST =====
+Erreur de test sur  500  SPAM :  17.4  %
+Erreur de test sur  500  HAM :  1.0  %
+Erreur de test globale sur  1000  mails :  9.2  %
+
+'''
