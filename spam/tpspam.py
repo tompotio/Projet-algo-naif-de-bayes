@@ -138,6 +138,7 @@ def prediction(x, Pspam, Pham, bspam, bham):
 		
 	@return Le taux d'erreur 
 '''
+
 def test(dossier, isSpam, Pspam, Pham, bspam, bham):
 	fichiers = os.listdir(dossier)
 	nb_erreurs = 0
@@ -189,8 +190,32 @@ def testClassifieur(dossier, isSpam, classifieur):
 	total_mails = len(fichiers)
 
 	Pspam, Pham, bspam, bham = (classifieur[k] for k in ["Pspam", "Pham", "bspam", "bham"])
+	dictionnaire = classifieur["dictionnaire"]
+	for i in range(total_mails):
+		fichier = fichiers[i]
 
-	return test(dossier, Pham, bspam, bham)
+		chemin_fichier = dossier + "/" + fichier		
+		x = lireMail(chemin_fichier, dictionnaire)
+		isSpam_pred, Pspam_x, Pham_x = prediction(x, Pspam, Pham, bspam, bham)
+
+		if isSpam_pred != isSpam:
+			nb_erreurs += 1
+
+		output = f"SPAM numéro {i} :" if isSpam else f"HAM numéro {i} :"
+		output += f" P(Y=SPAM | X=x) = {Pspam_x} P(Y=HAM | X=x) = {Pham_x}"
+
+		if isSpam_pred and isSpam: 
+			output += " => identifié comme un SPAM*" 
+		elif isSpam_pred and not isSpam:
+			output += " => identifié comme un SPAM *** erreur ***" 
+		elif not isSpam_pred and isSpam:
+			output += " => identifié comme un HAM *** erreur ***"
+		else:
+			output += " => identifié comme un HAM"
+
+		print(output)
+
+	return (nb_erreurs / total_mails)
 
 
 '''
@@ -392,9 +417,9 @@ def lancer_test(classifieur):
 
     # Test sur spam et ham
     print("\nTest sur les SPAM:")
-    spam_err_rate = test(dossier_spams_test, True, classifieur["Pspam"], classifieur["Pham"], classifieur["bspam"], classifieur["bham"]) * 100
+    spam_err_rate = testClassifieur(dossier_spams_test, True, classifieur) * 100
     print("\nTest sur les HAM:")
-    ham_err_rate = test(dossier_hams_test, False, classifieur["Pspam"], classifieur["Pham"], classifieur["bspam"], classifieur["bham"]) * 100
+    ham_err_rate = testClassifieur(dossier_hams_test, False, classifieur) * 100
 
     total_err_rate = (((spam_err_rate * mSpam_test) + (ham_err_rate * mHam_test)) / total_test)
     print("\n===== RÉSULTATS DU TEST =====")
