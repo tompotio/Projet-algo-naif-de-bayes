@@ -138,7 +138,7 @@ def prediction(x, Pspam, Pham, bspam, bham):
 		
 	@return Le taux d'erreur 
 '''
-def test(dossier, isSpam, Pspam, Pham, bspam, bham):
+def test(dossier, dictionnaire, isSpam, Pspam, Pham, bspam, bham):
 	fichiers = os.listdir(dossier)
 	nb_erreurs = 0
 	total_mails = len(fichiers)
@@ -371,6 +371,7 @@ def lancer_test(classifieur):
     if classifieur is None:
         print("Aucun classifieur n'est chargé pour effectuer un test.")
         return
+		
     # Choix de la base de test
     choix_test = input("Utiliser la base de test par défaut (tapez 'd') ou une base personnalisée (tapez 'p') ? ")
     if choix_test.lower() == 'd':
