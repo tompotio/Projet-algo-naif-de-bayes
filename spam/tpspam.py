@@ -27,9 +27,9 @@ def lireMail(fichier, dictionnaire : list):
 		return np.zeros(len(dictionnaire), dtype=bool)
 
 	# pre-traitement sur texte 
-	texte = re.sub(r"['’]", '', texte)
+	texte = re.sub(r'[^a-z\s]', ' ', texte)
 
-	# On garde que les mots d'au moins 3 lettres
+    # Extraction des mots de 3 lettres ou plus
 	mots = re.findall(r'\b[a-z]{3,}\b', texte)
 
 	x = np.zeros(len(dictionnaire), dtype=bool)
