@@ -415,13 +415,24 @@ def supprimer_classifieur():
 
 
 def maj_classifieur(classifieur):
-	chemin = input("Veuillez renseigner le chemin absolue vers le fichier mail : ")
-	isSpam = input("Votre mail est-il un spam ? (tapez 'y' ou 'n')")
+    chemin = input("Veuillez renseigner le chemin absolu vers le fichier ou dossier de mails : ").strip()
+    isSpam = input("Les mails sont-ils des spams ? (tapez 'y' ou 'n') : ").strip().lower()
+    spam_flag = isSpam == 'y'
 
-	if isSpam.lower() == 'y':
-		return updateClassifieur(chemin, True, classifieur)
-	else:
-		return updateClassifieur(chemin, False, classifieur)
+	# Fichier unique
+    if os.path.isfile(chemin):
+        return updateClassifieur(chemin, spam_flag, classifieur)
+    
+	# Dossier contenant plusieurs fichiers
+    elif os.path.isdir(chemin):
+        for nom_fichier in os.listdir(chemin):
+            chemin_fichier = os.path.join(chemin, nom_fichier)
+            if os.path.isfile(chemin_fichier):  # éviter les sous-dossiers
+                classifieur = updateClassifieur(chemin_fichier, spam_flag, classifieur)
+        return classifieur
+    else:
+        print("Chemin invalide. Veuillez fournir un fichier ou un dossier existant.")
+        return classifieur
 
 
 if __name__ == '__main__':
@@ -455,12 +466,3 @@ if __name__ == '__main__':
 			break
 		else:
 			print("Option non reconnue. Veuillez réessayer.")
-
-'''
-
-===== RÉSULTATS DU TEST =====
-Erreur de test sur  500  SPAM :  17.4  %
-Erreur de test sur  500  HAM :  1.0  %
-Erreur de test globale sur  1000  mails :  9.2  %
-
-'''
