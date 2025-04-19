@@ -6,17 +6,19 @@ import shutil
 from pathlib import Path
 from bayes_classifier import *
 
+dossier_dicos = "dics"
+
 def menu():
-	print("\n===== FILTRE ANTI-SPAM : MENU PRINCIPAL =====")
-	print("1. Sélectionner un classifieur existant")
-	print("2. Créer un nouveau classifieur")
-	print("3. Sauvegarder le classifieur courant")
-	print("4. Lancer le test du classifieur")
-	print("5. Supprimer un classifieur")
-	print("6. Mettre à jour le classifieur")
-	print("7. Quitter")
-	print("8. Splitter un dataset (SPAM / HAM)")
-	return input("Votre choix : ")
+    print("\n===== FILTRE ANTI-SPAM : MENU PRINCIPAL =====")
+    print("1. Sélectionner un classifieur existant")
+    print("2. Créer un nouveau classifieur")
+    print("3. Sauvegarder le classifieur courant")
+    print("4. Lancer le test du classifieur")
+    print("5. Supprimer un classifieur")
+    print("6. Mettre à jour le classifieur")
+    print("7. Splitter un dataset (SPAM / HAM)")
+    print("8. Quitter")
+    return input("Votre choix : ")
 
 
 def lister_classifieurs(dossier="saves"):
@@ -64,8 +66,39 @@ def creer_classifieur():
         dossier_spams = "baseapp/spam"
         dossier_hams = "baseapp/ham"
 
-    # Chargement du dictionnaire
-    dictionnaire = charge_dico("dictionnaire1000en.txt")
+    # Choix du dictionnaire
+    os.makedirs(dossier_dicos, exist_ok=True)
+    dicos = [f for f in os.listdir(dossier_dicos) if f.endswith(".txt")]
+
+    print("\n--- Sélection du dictionnaire ---")
+    if dicos:
+        print("Dictionnaires disponibles :")
+        for idx, nom in enumerate(dicos):
+            print(f"{idx + 1}. {nom}")
+        print(f"{len(dicos) + 1}. Importer un nouveau dictionnaire")
+
+        choix_dico = input("Choisissez un dictionnaire (numéro) : ")
+        try:
+            idx = int(choix_dico) - 1
+            # Choisit d'importer un nouveau dictionnaire ou bien d'utiliser un de ceux déjà là
+            if idx == len(dicos):
+                chemin_nouveau_dico = input("Chemin vers le nouveau dictionnaire : ").strip()
+                if os.path.isfile(chemin_nouveau_dico):
+                    nouveau_nom = os.path.basename(chemin_nouveau_dico)
+                    shutil.copy2(chemin_nouveau_dico, os.path.join(dossier_dicos, nouveau_nom))
+                    print(f"Dictionnaire '{nouveau_nom}' importé.")
+                    dictionnaire = charge_dico(os.path.join(dossier_dicos, nouveau_nom))
+                else:
+                    print("Fichier introuvable. Utilisation du dictionnaire par défaut.")
+                    dictionnaire = charge_dico("dictionnaire1000en.txt")
+            else:
+                dictionnaire = charge_dico(os.path.join(dossier_dicos, dicos[idx]))
+        except (ValueError, IndexError):
+            print("Choix invalide. Utilisation du dictionnaire par défaut.")
+            dictionnaire = charge_dico("dictionnaire1000en.txt")
+    else:
+        print("Aucun dictionnaire trouvé dans le dossier. Utilisation du dictionnaire par défaut.")
+        dictionnaire = charge_dico("dictionnaire1000en.txt")
     
     # Apprentissage sur les spams
     fichiers_spams = os.listdir(dossier_spams)

@@ -28,10 +28,10 @@ if __name__ == '__main__':
 			# Met à jour le classifieur.
 			maj_classifieur(classifieur_courant)
 		elif choix == "7":
-			print("Au revoir !")
-			break
-		elif choix == "8":
 			# Split un dataset en deux parties (apprentissage et test)
 			split_dataset_interface()
+		elif choix == "8":
+			print("Au revoir !")
+			break
 		else:
 			print("Option non reconnue. Veuillez réessayer.")
