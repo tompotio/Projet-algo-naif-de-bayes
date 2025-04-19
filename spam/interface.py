@@ -227,9 +227,10 @@ def split_dataset_interface():
         return
 
     try:
-        train_ratio = float(input("Proportion du dataset total à utiliser pour l'entraînement (ex: 0.7 pour 70%) : "))
-        if not (0 < train_ratio < 1):
-            print("Le ratio doit être entre 0 et 1.")
+        spam_ratio = float(input("Proportion des SPAM à utiliser pour l'entraînement (ex: 0.7 pour 70%) : "))
+        ham_ratio = float(input("Proportion des HAM à utiliser pour l'entraînement (ex: 0.5 pour 50%) : "))
+        if not (0 < spam_ratio < 1) or not (0 < ham_ratio < 1):
+            print("Les ratios doivent être entre 0 et 1.")
             return
     except ValueError:
         print("Entrée invalide.")
@@ -241,12 +242,12 @@ def split_dataset_interface():
             os.makedirs(os.path.join(output_dir, subset, label), exist_ok=True)
 
     # Fonction de split et copie
-    def split_and_copy(source_dir, label):
+    def split_and_copy(source_dir, label, ratio):
         fichiers = [f for f in os.listdir(source_dir) if os.path.isfile(os.path.join(source_dir, f))]
         random.shuffle(fichiers)
 
         n_total = len(fichiers)
-        n_train = math.floor(train_ratio * n_total)
+        n_train = math.floor(ratio * n_total)
         n_test = n_total - n_train
 
         train_files = fichiers[:n_train]
@@ -259,8 +260,8 @@ def split_dataset_interface():
 
         print(f"{label.upper()} : {n_train} pour train, {n_test} pour test (total : {n_total})")
 
-    # Exécute le split pour SPAM et HAM
-    split_and_copy(spam_dir, "spam")
-    split_and_copy(ham_dir, "ham")
+    # Split par classe avec les bons ratios
+    split_and_copy(spam_dir, "spam", spam_ratio)
+    split_and_copy(ham_dir, "ham", ham_ratio)
 
     print(f"\nSplit terminé. Résultat enregistré dans : {Path(output_dir).resolve()}")
