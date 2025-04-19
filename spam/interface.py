@@ -2,6 +2,7 @@ import numpy as np
 import os
 import random
 import shutil
+import math
 
 from pathlib import Path
 from bayes_classifier import *
@@ -216,86 +217,50 @@ def maj_classifieur(classifieur):
 
 
 def split_dataset_interface():
-    # Demande des chemins vers les dossiers SPAM et HAM
-    spam_dir = input("Chemin vers le dossier contenant les SPAM : ").strip()
-    ham_dir = input("Chemin vers le dossier contenant les HAM : ").strip()
+    print("\n=== SPLIT DU DATASET ===")
+    spam_dir = input("Chemin vers le dossier contenant les mails SPAM : ").strip()
+    ham_dir = input("Chemin vers le dossier contenant les mails HAM : ").strip()
     output_dir = input("Dossier de sortie (par défaut 'dataset') : ").strip() or "dataset"
-    
+
     if not os.path.isdir(spam_dir) or not os.path.isdir(ham_dir):
         print("Un ou les deux dossiers n'existent pas. Vérifiez les chemins.")
         return
 
-    # Demande des pourcentages pour le split global et pour SPAM/HAM dans chaque base
     try:
-        train_ratio = float(input("Pourcentage de données pour l'apprentissage (par exemple 0.7 pour 70%) : "))
+        train_ratio = float(input("Proportion du dataset total à utiliser pour l'entraînement (ex: 0.7 pour 70%) : "))
         if not (0 < train_ratio < 1):
-            print("Le pourcentage d'apprentissage doit être compris entre 0 et 1.")
+            print("Le ratio doit être entre 0 et 1.")
             return
     except ValueError:
-        print("Entrée invalide pour le pourcentage d'apprentissage.")
+        print("Entrée invalide.")
         return
 
-    try:
-        spam_train_ratio = float(input("Pourcentage de SPAM dans l'apprentissage (par exemple 0.6 pour 60%) : "))
-        ham_train_ratio = 1 - spam_train_ratio  # Complémentaire de SPAM
-        if not (0 <= spam_train_ratio <= 1):
-            print("Le pourcentage de SPAM dans l'apprentissage doit être compris entre 0 et 1.")
-            return
-    except ValueError:
-        print("Entrée invalide pour le pourcentage de SPAM dans l'apprentissage.")
-        return
+    # Crée les dossiers de sortie
+    for subset in ['train', 'test']:
+        for label in ['spam', 'ham']:
+            os.makedirs(os.path.join(output_dir, subset, label), exist_ok=True)
 
-    try:
-        spam_test_ratio = float(input("Pourcentage de SPAM dans le test (par exemple 0.5 pour 50%) : "))
-        ham_test_ratio = 1 - spam_test_ratio  # Complémentaire de SPAM
-        if not (0 <= spam_test_ratio <= 1):
-            print("Le pourcentage de SPAM dans le test doit être compris entre 0 et 1.")
-            return
-    except ValueError:
-        print("Entrée invalide pour le pourcentage de SPAM dans le test.")
-        return
-
-    os.makedirs(os.path.join(output_dir, "train", "spam"), exist_ok=True)
-    os.makedirs(os.path.join(output_dir, "train", "ham"), exist_ok=True)
-    os.makedirs(os.path.join(output_dir, "test", "spam"), exist_ok=True)
-    os.makedirs(os.path.join(output_dir, "test", "ham"), exist_ok=True)
-
-    def split_and_copy(source_dir, label, target_dir, target_ratio, ratio):
+    # Fonction de split et copie
+    def split_and_copy(source_dir, label):
         fichiers = [f for f in os.listdir(source_dir) if os.path.isfile(os.path.join(source_dir, f))]
         random.shuffle(fichiers)
 
-        split_point = int(len(fichiers) * target_ratio)
-        files_for_split = fichiers[:split_point]
+        n_total = len(fichiers)
+        n_train = math.floor(train_ratio * n_total)
+        n_test = n_total - n_train
 
-        files_for_split_count = len(files_for_split)
-        if files_for_split_count == 0:
-            print(f"Aucun fichier à répartir pour {label}. Vérifiez les proportions.")
-            return
+        train_files = fichiers[:n_train]
+        test_files = fichiers[n_train:]
 
-        spam_count = int(files_for_split_count * ratio)
-        ham_count = files_for_split_count - spam_count
+        for f in train_files:
+            shutil.copy2(os.path.join(source_dir, f), os.path.join(output_dir, 'train', label, f))
+        for f in test_files:
+            shutil.copy2(os.path.join(source_dir, f), os.path.join(output_dir, 'test', label, f))
 
-        if spam_count > len([f for f in files_for_split if 'spam' in f.lower()]):
-            print(f"Pas assez de fichiers SPAM dans {label} pour respecter le ratio demandé.")
-            return
-        if ham_count > len([f for f in files_for_split if 'ham' in f.lower()]):
-            print(f"Pas assez de fichiers HAM dans {label} pour respecter le ratio demandé.")
-            return
+        print(f"{label.upper()} : {n_train} pour train, {n_test} pour test (total : {n_total})")
 
-        for i, fichier in enumerate(files_for_split[:spam_count]):
-            src = os.path.join(source_dir, fichier)
-            dst = os.path.join(target_dir, "spam", fichier)
-            shutil.copy2(src, dst)
+    # Exécute le split pour SPAM et HAM
+    split_and_copy(spam_dir, "spam")
+    split_and_copy(ham_dir, "ham")
 
-        for i, fichier in enumerate(files_for_split[spam_count:]):
-            src = os.path.join(source_dir, fichier)
-            dst = os.path.join(target_dir, "ham", fichier)
-            shutil.copy2(src, dst)
-
-    split_and_copy(spam_dir, "spam", os.path.join(output_dir, "train"), train_ratio, spam_train_ratio)
-    split_and_copy(ham_dir, "ham", os.path.join(output_dir, "train"), train_ratio, ham_train_ratio)
-
-    split_and_copy(spam_dir, "spam", os.path.join(output_dir, "test"), 1 - train_ratio, spam_test_ratio)
-    split_and_copy(ham_dir, "ham", os.path.join(output_dir, "test"), 1 - train_ratio, ham_test_ratio)
-
-    print(f"\n Split terminé. Résultat dans : {Path(output_dir).resolve()}")
+    print(f"\nSplit terminé. Résultat enregistré dans : {Path(output_dir).resolve()}")
