@@ -209,7 +209,7 @@ def maj_classifieur(classifieur):
         for nom_fichier in os.listdir(chemin):
             chemin_fichier = os.path.join(chemin, nom_fichier)
             if os.path.isfile(chemin_fichier):  # éviter les sous-dossiers
-                classifieur = updateClassifieur(chemin_fichier, spam_flag, classifieur)
+                updateClassifieur(chemin_fichier, spam_flag, classifieur)
         return classifieur
     else:
         print("Chemin invalide. Veuillez fournir un fichier ou un dossier existant.")
