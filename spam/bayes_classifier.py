@@ -1,14 +1,13 @@
 import numpy as np
 import os
-import math
 import re
+from pathlib import Path
 import pickle
-
-epsilon = .1
 
 # ======================================================================================
 # 								ALGORITHME NAIF DE BAYES
 # ======================================================================================
+
 
 '''
 	@brief	Fonction qui charge un dictionnaire dans un tableau (liste python) de
@@ -27,9 +26,9 @@ def lireMail(fichier, dictionnaire : list):
 		return np.zeros(len(dictionnaire), dtype=bool)
 
 	# pre-traitement sur texte 
-	texte = re.sub(r"['’]", '', texte)
+	texte = re.sub(r'[^a-z\s]', ' ', texte)
 
-	# On garde que les mots d'au moins 3 lettres
+    # Extraction des mots de 3 lettres ou plus
 	mots = re.findall(r'\b[a-z]{3,}\b', texte)
 
 	x = np.zeros(len(dictionnaire), dtype=bool)
@@ -167,57 +166,91 @@ def test(dossier, dictionnaire, isSpam, Pspam, Pham, bspam, bham):
 
 		print(output)
 
-	return (nb_erreurs / total_mails)	
-
+	return (nb_erreurs / total_mails)
 
 
 # ======================================================================================
-# 										PROGRAMME
+# 									CLASSIFIEUR
 # ======================================================================================
- 
-dossier_spams = "baseapp/spam"
-dossier_hams = "baseapp/ham"
 
-fichiersspams = os.listdir(dossier_spams)
-fichiershams = os.listdir(dossier_hams)
 
-mSpam = len(fichiersspams)
-mHam = len(fichiershams)
-total = (mSpam + mHam)
+'''
+	@brief Fonctionne exactement comme test mais à partir d'un classifieur 
+	sous forme de structure plutôt que de toute la liste des paramètres.
 
-# Chargement du dictionnaire:
-dictionnaire = charge_dico("dictionnaire1000en.txt")
-#print(dictionnaire)
+	@param dossier : Dossier des mails à tester. 
+	@param classifier :
 
-# Apprentissage des bspam et bham:
-print("apprentissage de bspam...")
-bspam = apprendBinomial(dossier_spams, fichiersspams, dictionnaire)
-print("apprentissage de bham...")
-bham = apprendBinomial(dossier_hams, fichiershams, dictionnaire)
+	@return Le taux d'erreur.
+'''
+def testClassifieur(dossier, isSpam, classifieur):
+	Pspam, Pham, bspam, bham, dictionnaire = (classifieur[k] for k in ["Pspam", "Pham", "bspam", "bham", "dictionnaire"])
+	return test(dossier, dictionnaire, isSpam, Pspam, Pham, bspam, bham)
 
-# Calcul des probabilités a priori Pspam et Pham:
-Pspam = mSpam / total
-Pham = mHam / total
 
-# Calcul des erreurs avec la fonction test():
+'''
+	@brief Sauvegarde un classifieur.
 
-dossier_spams_test = "basetest/spam"
-dossier_hams_test = "basetest/ham"
+	@param dossier : Chemin du dossier dans lequel enregistrer le classifieur.
+	@param nom : Nom du fichier à enregistrer.
+'''
+def sauvegarderClassifieur(classifieur, dossier = "saves", nom = "classifieur.pkl"):
+	if not os.path.exists(dossier):
+		os.makedirs(dossier)
+	chemin_fichier = os.path.join(dossier,nom)
+	try:
+		with open(chemin_fichier,"wb") as f:
+			pickle.dump(classifieur,f)
+			return 1
+	except:
+		print("Une erreur est suvrenue\nLe classifieur n'a pas pu être sauvegardé correctement.\n")
+		return None
 
-fichiersspams_test = os.listdir(dossier_spams_test)
-fichiershams_test = os.listdir(dossier_hams_test)
 
-mSpam_test = len(fichiersspams_test)
-mHam_test = len(fichiershams_test)
-total_test = (mSpam_test + mHam_test)
+'''
+	@brief Charge un classifieur et renvoie un objet classifieur, qui peut être ensuite utilisé.
 
-fichiersspams_test = os.listdir(dossier_spams_test)
-fichiershams_test = os.listdir(dossier_hams_test)
+	@dossier : Checmin du dossier dans lequel a été enregistré le classifieur.i
 
-spam_err_rate = test(dossier_spams_test, dictionnaire, True, Pspam, Pham, bspam, bham) * 100
-ham_err_rate = test(dossier_hams_test, dictionnaire, False, Pspam, Pham, bspam, bham) * 100
-total_err_rate = (((spam_err_rate * mSpam) + (ham_err_rate * mHam)) / total_test)
+	@return Un classifieur.
+'''
+def chargerClassifieur(dossier = "saves", nom = "classifieur.pkl"):
+	chemin_fichier = os.path.join(dossier,nom)
+	if not os.path.exists(chemin_fichier):
+		print(f"Erreur -> Aucun fichier de ce type : {nom}")
+		return None
+	else: 
+		with open(chemin_fichier,"rb") as f:
+			return pickle.load(f)
 
-print("Erreur de test sur ", mSpam_test, " SPAM : ", spam_err_rate, " %")
-print("Erreur de test sur ", mHam_test, " HAM : ", ham_err_rate, " %")
-print("Erreur de test globale sur ", total_test, " mails : ", total_err_rate, " %")
+
+def updateClassifieur(chemin_mail, isSpam, classifieur):
+	global epsilon 
+
+	if classifieur == None:
+		print("Erreur lors de la récupération du classifieur")
+		return
+	
+	dictionnaire = classifieur["dictionnaire"]
+	x = lireMail(chemin_mail, dictionnaire).astype(float)
+	
+	if isSpam:
+		old_m = classifieur["mSpam"]
+		old_nj = classifieur["bspam"] * (old_m + 2 * epsilon) - epsilon
+		new_nj = old_nj + x
+		new_m = old_m + 1
+		classifieur["bspam"] = (new_nj + epsilon) / (new_m + 2 * epsilon)
+		classifieur["mSpam"] = new_m
+	else: 
+		old_m = classifieur["mHam"]
+		old_nj = classifieur["bham"] * (old_m + 2 * epsilon) - epsilon
+		new_nj = old_nj + x
+		new_m = old_m + 1
+		classifieur["bham"] = (new_nj + epsilon) / (new_m + 2 * epsilon)
+		classifieur["mHam"] = new_m	
+
+	total = classifieur["mHam"] + classifieur["mSpam"]
+	classifieur["PSpam"] = classifieur["mSpam"] / total
+	classifieur["Pham"] = classifieur["mHam"] / total
+
+	print("Le classifieur a été mis à jour avec le nouveau mail : ", chemin_mail)
